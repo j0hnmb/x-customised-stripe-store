@@ -35,4 +35,3 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 app.listen(4242, () => console.log("✅ Server running on http://localhost:4242"));
-console.log("Creating Stripe session with:", line_items);
