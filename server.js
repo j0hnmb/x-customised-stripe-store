@@ -54,5 +54,5 @@ app.post("/create-checkout-session", async (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log("🔍 Stripe key loaded:", process.env.STRIPE_SECRET_KEY ? "✅ YES" : "❌ NO");
 });
