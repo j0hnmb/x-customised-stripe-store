@@ -4,28 +4,36 @@ const path = require("path");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
+const PORT = process.env.PORT || 4242;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static("public")); // ✅ Serve static HTML, CSS, JS
+app.use(express.static("public"));
 
-// Fallback for direct / route
+// Home route fallback
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Stripe checkout session creation
+// Stripe checkout session route
 app.post("/create-checkout-session", async (req, res) => {
   const cartItems = req.body.cart;
 
+  // Validate cart input
+  if (!Array.isArray(cartItems)) {
+    console.error("❌ Invalid cart format:", req.body);
+    return res.status(400).json({ error: "Invalid cart format" });
+  }
+
+  // Build line_items for Stripe
   const line_items = cartItems.map(item => ({
     price_data: {
       currency: "gbp",
       product_data: { name: item.name },
-      unit_amount: Math.round(item.price * 100)
+      unit_amount: Math.round(item.price * 100),
     },
-    quantity: 1
+    quantity: item.quantity || 1,
   }));
 
   try {
@@ -34,17 +42,17 @@ app.post("/create-checkout-session", async (req, res) => {
       line_items,
       mode: "payment",
       success_url: `${req.headers.origin}/success.html`,
-      cancel_url: `${req.headers.origin}/cancel.html`
+      cancel_url: `${req.headers.origin}/cancel.html`,
     });
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Stripe error:", err);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Stripe error:", err);
+    res.status(500).json({ error: "Failed to create Stripe session" });
   }
 });
 
 // Start server
-const PORT = process.env.PORT || 4242;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
-console.log("ENV STRIPE KEY:", process.env.STRIPE_SECRET_KEY ? "✔️ Present" : "❌ Missing");
+app.listen(PORT, () => {
+  console.log(`✅ Server running on http://localhost:${PORT}`);
+});
