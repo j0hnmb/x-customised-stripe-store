@@ -47,3 +47,4 @@ app.post("/create-checkout-session", async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+console.log("ENV STRIPE KEY:", process.env.STRIPE_SECRET_KEY ? "✔️ Present" : "❌ Missing");
