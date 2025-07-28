@@ -35,6 +35,7 @@ app.post("/upload-photo", upload.single("photo"), (req, res) => {
 
 app.post("/create-checkout-session", async (req, res) => {
   const { cart, customer } = req.body;
+<<<<<<< HEAD
   const line_items = cartItems.map(item => ({
     price_data: {
       currency: "gbp",
@@ -43,6 +44,22 @@ app.post("/create-checkout-session", async (req, res) => {
     },
     quantity: item.quantity || 1
   }));
+=======
+  const cartItems = JSON.parse(req.body.cart || "[]");
+
+const line_items = cartItems.map(item => ({
+  price_data: {
+    currency: "gbp",
+    product_data: {
+      name: item.name,
+      description: `${item.options?.text || ""} - ${item.options?.model || ""}`
+    },
+    unit_amount: Math.round(item.price * 100)
+  },
+  quantity: item.quantity || 1
+}));
+
+>>>>>>> 7265507 (Fix: cleaned .env.example and updated site changes)
 
   try {
     const session = await stripe.checkout.sessions.create({
