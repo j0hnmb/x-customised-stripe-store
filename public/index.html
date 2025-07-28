@@ -12,13 +12,36 @@
     <p>Memories Made Personal</p>
     <nav>
       <a href="index.html">Home</a>
-      <a href="about.html">About</a>
+      <a href="products.html">Products</a>
+      <a href="about.html">About Us</a>
       <a href="contact.html">Contact</a>
-      <a href="#" onclick="viewCart()">Cart 🛒</a>
+      <a href="cart.html">
+        🛒 Cart <span id="cart-count">(0)</span>
+      </a>
+      <button class="theme-btn" onclick="toggleTheme()">Light/Dark</button>
     </nav>
   </header>
-  <main id="products"></main>
-  <div id="cart" class="cart-modal"></div>
+
+  <main>
+    <section id="products"></section>
+  </main>
+
+  <script>
+    // Theme toggle with localStorage
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle("light-mode");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+    }
+
+    // Apply saved theme on load
+    (function () {
+      const saved = localStorage.getItem("theme");
+      if (saved === "light") {
+        document.body.classList.add("light-mode");
+      }
+    })();
+  </script>
+
   <script src="products.js"></script>
 </body>
 </html>

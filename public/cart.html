@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Your Cart - X Customised</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Your Cart</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="about.html">About Us</a>
+      <a href="contact.html">Contact</a>
+      <a href="cart.html">
+        🛒 Cart <span id="cart-count">(0)</span>
+      </a>
+      <button class="theme-btn" onclick="toggleTheme()">Light/Dark</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="cart" class="cart-container"></section>
+
+    <div id="checkout-form">
+      <input type="text" id="customer-name" placeholder="Your Name" required />
+      <input type="email" id="customer-email" placeholder="Your Email" required />
+    </div>
+  </main>
+
+  <script>
+    // Theme logic
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle("light-mode");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+    }
+
+    (function () {
+      const saved = localStorage.getItem("theme");
+      if (saved === "light") {
+        document.body.classList.add("light-mode");
+      }
+    })();
+  </script>
+
+  <script src="products.js"></script>
+</body>
+</html>
