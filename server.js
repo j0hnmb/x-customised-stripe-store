@@ -29,20 +29,35 @@ const upload = multer({ storage });
 app.post("/create-checkout-session", upload.any(), async (req, res) => {
   try {
     const cart = JSON.parse(req.body.cart || "[]");
-    if (!cart.length) throw new Error("Cart is empty");
+    const customer = {
+      name: req.body.name || "Unknown",
+      email: req.body.email || process.env.EMAIL_TO
+    };
 
-    const line_items = cart.map(item => ({
-      price_data: {
-        currency: "gbp",
-        product_data: {
-          name: item.name,
-          description: `${item.options?.text || ""} - ${item.options?.model || ""}`
+    if (!cart.length) {
+      throw new Error("Cart is empty");
+    }
+
+    // ✅ Build line_items for Stripe
+    const line_items = cart.map(item => {
+      if (!item.name || typeof item.price !== "number" || !item.quantity) {
+        throw new Error("Invalid cart item");
+      }
+
+      return {
+        price_data: {
+          currency: "gbp",
+          product_data: {
+            name: item.name,
+            description: `${item.options?.text || ""} - ${item.options?.model || ""}`.trim()
+          },
+          unit_amount: Math.round(item.price * 100)
         },
-        unit_amount: Math.round(item.price * 100)
-      },
-      quantity: item.quantity || 1
-    }));
+        quantity: item.quantity
+      };
+    });
 
+    // ✅ Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items,
@@ -51,22 +66,17 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       cancel_url: `${process.env.DOMAIN}/cancel.html`
     });
 
+    // ✅ Save uploaded photos + cart
     const orderId = `order-${Date.now()}`;
-    const orderFile = path.join(ordersDir, `${orderId}.json`);
+    const orderFile = path.join(__dirname, "orders", `${orderId}.json`);
     fs.writeFileSync(orderFile, JSON.stringify(cart, null, 2));
 
-    await sendOrderEmail(cart, orderId);
+    // ✅ Prepare email
+    const attachments = req.files?.map(file => ({
+      filename: file.originalname,
+      path: file.path
+    })) || [];
 
-    res.json({ url: session.url });
-
-  } catch (err) {
-    console.error("❌ Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-function sendOrderEmail(cart, orderId) {
-  return new Promise((resolve, reject) => {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -75,40 +85,37 @@ function sendOrderEmail(cart, orderId) {
       }
     });
 
-    const attachments = cart
-      .filter(p => p.options?.photo)
-      .map(p => ({
-        filename: p.options.photo,
-        path: path.join(uploadDir, p.options.photo)
-      }));
-
     const html = `
-      <h2>🧾 New Order: ${orderId}</h2>
-      <ul>
-        ${cart.map(p => `
-          <li>
-            <strong>${p.quantity} × ${p.name}</strong><br/>
-            Text: ${p.options?.text || "-"}<br/>
-            Model: ${p.options?.model || "-"}<br/>
-            Photo: ${p.options?.photo || "No file"}
-          </li>
-        `).join("")}
-      </ul>
+      <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>🧾 New Order: ${orderId}</h2>
+        <p><strong>From:</strong> ${customer.name} (${customer.email})</p>
+        <ul>
+          ${cart.map(p => `
+            <li>
+              <strong>${p.quantity} × ${p.name}</strong> - £${(p.price * p.quantity).toFixed(2)}<br/>
+              Text: ${p.options?.text || "None"}<br/>
+              Model: ${p.options?.model || "N/A"}<br/>
+              Photo: ${p.options?.photo || "No file"}
+            </li>
+          `).join("")}
+        </ul>
+      </div>
     `;
 
-    transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_TO || process.env.EMAIL_USER,
-      subject: `🛒 New Order Received: ${orderId}`,
+    await transporter.sendMail({
+      from: `"X Customised" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_TO,
+      subject: `New Order: ${orderId}`,
       html,
       attachments
-    }, (err, info) => {
-      if (err) reject(err);
-      else resolve(info);
     });
-  });
-}
 
-app.listen(4242, () => {
-  console.log("✅ Server running on http://localhost:4242");
+    // ✅ Respond with Stripe session URL
+    res.json({ url: session.url });
+
+  } catch (err) {
+    console.error("❌ Stripe session error:", err);
+    res.status(500).json({ error: err.message || "Server error" });
+  }
 });
+
