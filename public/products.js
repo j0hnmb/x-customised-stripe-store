@@ -141,8 +141,8 @@ function viewCart() {
   }
 
   const items = cart.map((p, i) => {
-    const imagePreview = p.photoFile
-      ? URL.createObjectURL(p.photoFile)
+    const imagePreview = p.options?.photoFilename
+      ? `/uploads/${p.options.photoFilename}`
       : "images/upload-placeholder.png";
 
     return `
@@ -191,6 +191,8 @@ async function checkout() {
   });
 
   formData.append("cart", JSON.stringify(processedCart));
+  formData.append("name", document.getElementById("customer-name")?.value || "");
+  formData.append("email", document.getElementById("customer-email")?.value || "");
 
   try {
     const response = await fetch("/create-checkout-session", {
