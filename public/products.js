@@ -141,9 +141,10 @@ function viewCart() {
   }
 
   const items = cart.map((p, i) => {
-    const imagePreview = p.options?.photoFilename
-      ? `/uploads/${p.options.photoFilename}`
-      : "images/upload-placeholder.png";
+    const imagePreview = p.photoFile
+  ? URL.createObjectURL(p.photoFile)
+  : p.image || "images/upload-placeholder.png";
+
 
     return `
       <li class="cart-item">
