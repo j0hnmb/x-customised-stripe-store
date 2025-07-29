@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>About Us - X Customised</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>About Us</h1>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="products.html">Products</a>
+      <a href="about.html">About Us</a>
+      <a href="contact.html">Contact</a>
+      <a href="cart.html">
+        🛒 Cart <span id="cart-count">(0)</span>
+      </a>
+      <button class="theme-btn" onclick="toggleTheme()">Light/Dark</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="about-section">
+      <h2>Welcome to X Customised</h2>
+      <p>
+        At X Customised, we believe every memory deserves to be celebrated. From personalised photo mugs to 3D lamps, our custom products are made to capture your special moments beautifully.
+      </p>
+      <p>
+        Whether it's a gift or something special for yourself, we make it easy to personalise, preview, and share what matters most to you.
+      </p>
+      <p>
+        Handcrafted with love in the UK 🇬🇧
+      </p>
+    </section>
+  </main>
+
+  <script>
+    // Theme logic
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle("light-mode");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+    }
+
+    (function () {
+      const saved = localStorage.getItem("theme");
+      if (saved === "light") {
+        document.body.classList.add("light-mode");
+      }
+    })();
+  </script>
+
+  <script src="products.js"></script>
+</body>
+</html>
