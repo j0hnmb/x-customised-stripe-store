@@ -38,7 +38,7 @@ const products = [
 
 let cart = [];
 
-// Load cart from localStorage
+// Load from localStorage
 if (localStorage.getItem("cart")) {
   try {
     cart = JSON.parse(localStorage.getItem("cart"));
@@ -52,7 +52,7 @@ function saveCart() {
 }
 
 function renderProducts() {
-  const container = document.getElementById('products');
+  const container = document.getElementById("products");
   if (!container) return;
 
   container.innerHTML = products.map(p => `
@@ -83,10 +83,10 @@ function renderProducts() {
       </div>
 
       <label for="qty-${p.id}">Qty:</label>
-      <input type="number" id="qty-${p.id}" value="1" min="1" style="width: 60px;" />
+      <input type="number" id="qty-${p.id}" value="1" min="1" />
       <button onclick="addToCart(${p.id})">Add to Cart</button>
     </div>
-  `).join('');
+  `).join("");
 }
 
 function addToCart(id) {
@@ -95,19 +95,31 @@ function addToCart(id) {
   const model = document.getElementById(`model-${id}`).value || "";
   const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
   const photoInput = document.getElementById(`photo-${id}`);
-  const photoFile = photoInput?.files?.[0] || null;
+  const photo = photoInput?.files?.[0] || null;
 
-  cart.push({
-    ...product,
-    quantity: qty,
-    options: { text, model, photo: photoFile }
-  });
+  const existingIndex = cart.findIndex(
+    item => item.id === id &&
+            item.options?.text === text &&
+            item.options?.model === model
+  );
+
+  const photoFilename = photo ? photo.name : null;
+
+  if (existingIndex > -1) {
+    cart[existingIndex].quantity += qty;
+  } else {
+    cart.push({
+      ...product,
+      quantity: qty,
+      options: { text, model, photoFilename },
+      photoFile: photo
+    });
+  }
 
   saveCart();
-  alert(`${qty} x ${product.name} added to cart!`);
+  alert(`${qty} x ${product.name} added to cart.`);
   viewCart();
 }
-
 
 function removeFromCart(index) {
   cart.splice(index, 1);
@@ -142,7 +154,7 @@ function viewCart() {
         <button onclick="removeFromCart(${i})">Remove</button>
       </div>
     </li>
-  `).join('');
+  `).join("");
 
   const total = cart.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2);
 
@@ -165,27 +177,23 @@ async function checkout() {
       name,
       price,
       quantity,
-      options: {
-        text: options?.text || "",
-        model: options?.model || "",
-        photo: options?.photo?.name || "" // only file name sent here
-      }
+      options
     });
 
-    if (options?.photo instanceof File) {
-      formData.append(`photo-${i}`, options.photo);
+    if (item.photoFile) {
+      formData.append(`photo-${i}`, item.photoFile);
     }
   });
 
   formData.append("cart", JSON.stringify(processedCart));
 
   try {
-    const res = await fetch("/create-checkout-session", {
+    const response = await fetch("/create-checkout-session", {
       method: "POST",
       body: formData
     });
 
-    const result = await res.json();
+    const result = await response.json();
 
     if (result.url) {
       localStorage.removeItem("cart");
@@ -199,8 +207,6 @@ async function checkout() {
   }
 }
 
-
-// Run on page load
 if (document.getElementById("products")) {
   renderProducts();
 }
