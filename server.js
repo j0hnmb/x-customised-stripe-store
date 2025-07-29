@@ -1,13 +1,16 @@
+// server.js
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.static("public"));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
@@ -17,6 +20,7 @@ const ordersDir = path.join(__dirname, "orders");
 fs.mkdirSync(uploadDir, { recursive: true });
 fs.mkdirSync(ordersDir, { recursive: true });
 
+// File upload config
 const storage = multer.diskStorage({
   destination: (_, __, cb) => cb(null, uploadDir),
   filename: (_, file, cb) => {
@@ -28,20 +32,33 @@ const upload = multer({ storage });
 
 app.post("/create-checkout-session", upload.any(), async (req, res) => {
   try {
-    const cart = JSON.parse(req.body.cart || "[]");
+    const rawCart = req.body.cart || "[]";
+    let cart;
+
+    try {
+      cart = JSON.parse(rawCart);
+    } catch (err) {
+      throw new Error("Invalid cart JSON format");
+    }
+
+    if (!Array.isArray(cart) || cart.length === 0) {
+      throw new Error("Cart is empty or malformed");
+    }
+
     const customer = {
-      name: req.body.name || "Unknown",
+      name: req.body.name || "Anonymous",
       email: req.body.email || process.env.EMAIL_TO
     };
 
-    if (!cart.length) {
-      throw new Error("Cart is empty");
-    }
-
-    // ✅ Build line_items for Stripe
+    // Validate items and build line_items
     const line_items = cart.map(item => {
-      if (!item.name || typeof item.price !== "number" || !item.quantity) {
-        throw new Error("Invalid cart item");
+      if (
+        !item.name ||
+        typeof item.price !== "number" ||
+        !item.quantity ||
+        item.quantity < 1
+      ) {
+        throw new Error(`Invalid item: ${item.name}`);
       }
 
       return {
@@ -49,7 +66,7 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
           currency: "gbp",
           product_data: {
             name: item.name,
-            description: `${item.options?.text || ""} - ${item.options?.model || ""}`.trim()
+            description: `${item.options?.text || ""} - ${item.options?.model || ""}`
           },
           unit_amount: Math.round(item.price * 100)
         },
@@ -57,7 +74,6 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       };
     });
 
-    // ✅ Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       line_items,
@@ -66,17 +82,18 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       cancel_url: `${process.env.DOMAIN}/cancel.html`
     });
 
-    // ✅ Save uploaded photos + cart
+    // Save cart to file
     const orderId = `order-${Date.now()}`;
-    const orderFile = path.join(__dirname, "orders", `${orderId}.json`);
+    const orderFile = path.join(ordersDir, `${orderId}.json`);
     fs.writeFileSync(orderFile, JSON.stringify(cart, null, 2));
 
-    // ✅ Prepare email
+    // Handle photo uploads
     const attachments = req.files?.map(file => ({
       filename: file.originalname,
       path: file.path
     })) || [];
 
+    // Send email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -110,7 +127,6 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       attachments
     });
 
-    // ✅ Respond with Stripe session URL
     res.json({ url: session.url });
 
   } catch (err) {
@@ -119,3 +135,6 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
   }
 });
 
+app.listen(4242, () => {
+  console.log("✅ Server running at http://localhost:4242");
+});

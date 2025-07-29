@@ -38,10 +38,9 @@ const products = [
 
 let cart = [];
 
-// Load from localStorage
 if (localStorage.getItem("cart")) {
   try {
-    cart = JSON.parse(localStorage.getItem("cart"));
+    cart = JSON.parse(localStorage.getItem("cart")) || [];
   } catch {
     cart = [];
   }
@@ -91,9 +90,9 @@ function renderProducts() {
 
 function addToCart(id) {
   const product = products.find(p => p.id === id);
-  const text = document.getElementById(`text-${id}`).value || "";
-  const model = document.getElementById(`model-${id}`).value || "";
-  const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
+  const text = document.getElementById(`text-${id}`)?.value || "";
+  const model = document.getElementById(`model-${id}`)?.value || "";
+  const qty = parseInt(document.getElementById(`qty-${id}`)?.value) || 1;
   const photoInput = document.getElementById(`photo-${id}`);
   const photo = photoInput?.files?.[0] || null;
 
@@ -141,20 +140,26 @@ function viewCart() {
     return;
   }
 
-  const items = cart.map((p, i) => `
-    <li class="cart-item">
-      <img src="${p.image}" alt="${p.name}" class="cart-thumb" />
-      <div>
-        <strong>${p.quantity} × ${p.name}</strong> - £${(p.price * p.quantity).toFixed(2)}
-        <ul>
-          <li><strong>Text:</strong> ${p.options?.text || "None"}</li>
-          <li><strong>Model:</strong> ${p.options?.model || "N/A"}</li>
-          <li><strong>Photo:</strong> ${p.options?.photoFilename || "No file"}</li>
-        </ul>
-        <button onclick="removeFromCart(${i})">Remove</button>
-      </div>
-    </li>
-  `).join("");
+  const items = cart.map((p, i) => {
+    const imagePreview = p.photoFile
+      ? URL.createObjectURL(p.photoFile)
+      : "images/upload-placeholder.png";
+
+    return `
+      <li class="cart-item">
+        <img src="${imagePreview}" alt="${p.name}" class="cart-thumb" />
+        <div>
+          <strong>${p.quantity} × ${p.name}</strong> - £${(p.price * p.quantity).toFixed(2)}
+          <ul>
+            <li><strong>Text:</strong> ${p.options?.text || "None"}</li>
+            <li><strong>Model:</strong> ${p.options?.model || "N/A"}</li>
+            <li><strong>Photo:</strong> ${p.options?.photoFilename || "No file"}</li>
+          </ul>
+          <button onclick="removeFromCart(${i})">Remove</button>
+        </div>
+      </li>
+    `;
+  }).join("");
 
   const total = cart.reduce((sum, p) => sum + (p.price * p.quantity), 0).toFixed(2);
 
