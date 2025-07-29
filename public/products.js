@@ -95,29 +95,19 @@ function addToCart(id) {
   const model = document.getElementById(`model-${id}`).value || "";
   const qty = parseInt(document.getElementById(`qty-${id}`).value) || 1;
   const photoInput = document.getElementById(`photo-${id}`);
-  const photo = photoInput?.files?.[0] || null;
+  const photoFile = photoInput?.files?.[0] || null;
 
-  const existingIndex = cart.findIndex(
-    item => item.id === id && item.options?.text === text && item.options?.model === model
-  );
-
-  const photoFilename = photo ? photo.name : null;
-
-  if (existingIndex > -1) {
-    cart[existingIndex].quantity += qty;
-  } else {
-    cart.push({
-      ...product,
-      quantity: qty,
-      options: { text, model, photoFilename },
-      photoFile: photo // keep original file to upload
-    });
-  }
+  cart.push({
+    ...product,
+    quantity: qty,
+    options: { text, model, photo: photoFile }
+  });
 
   saveCart();
-  alert(`${qty} x ${product.name} added to cart.`);
+  alert(`${qty} x ${product.name} added to cart!`);
   viewCart();
 }
+
 
 function removeFromCart(index) {
   cart.splice(index, 1);
@@ -170,39 +160,45 @@ async function checkout() {
 
   cart.forEach((item, i) => {
     const { name, price, quantity, options } = item;
+
     processedCart.push({
       name,
       price,
       quantity,
-      options
+      options: {
+        text: options?.text || "",
+        model: options?.model || "",
+        photo: options?.photo?.name || "" // only file name sent here
+      }
     });
 
-    if (item.photoFile) {
-      formData.append(`photo-${i}`, item.photoFile);
+    if (options?.photo instanceof File) {
+      formData.append(`photo-${i}`, options.photo);
     }
   });
 
   formData.append("cart", JSON.stringify(processedCart));
 
   try {
-    const response = await fetch("/create-checkout-session", {
+    const res = await fetch("/create-checkout-session", {
       method: "POST",
       body: formData
     });
 
-    const result = await response.json();
+    const result = await res.json();
 
     if (result.url) {
       localStorage.removeItem("cart");
       window.location.href = result.url;
     } else {
-      alert("Failed to create Stripe session.");
+      alert("⚠️ Failed to create Stripe session.");
     }
-  } catch (error) {
-    console.error("Checkout error:", error);
+  } catch (err) {
+    console.error("❌ Checkout error:", err);
     alert("An error occurred during checkout.");
   }
 }
+
 
 // Run on page load
 if (document.getElementById("products")) {

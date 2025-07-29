@@ -1,43 +1,50 @@
-require('dotenv').config();
+// server.js
 const express = require("express");
 const cors = require("cors");
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const multer = require("multer");
-const nodemailer = require("nodemailer");
-const fs = require("fs");
 const path = require("path");
+const nodemailer = require("nodemailer");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+require("dotenv").config();
 
 const app = express();
-const upload = multer();
-
 app.use(cors());
-app.use(express.json());
 app.use(express.static("public"));
 
+// 🖼️ File Upload Setup
+const storage = multer.diskStorage({
+  destination: "orders/uploads",
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname.replace(/\s+/g, "_"));
+  }
+});
+const upload = multer({ storage });
+
+// ✅ Checkout Route
 app.post("/create-checkout-session", upload.any(), async (req, res) => {
   try {
-    const cartItems = JSON.parse(req.body.cart);
-    const customerName = req.body.name || "Anonymous";
-    const customerEmail = req.body.email || "no@email.com";
+    const cart = JSON.parse(req.body.cart || "[]");
+    if (!cart.length) throw new Error("Cart is empty");
 
-    const line_items = cartItems.map(item => ({
+    const line_items = cart.map(item => ({
       price_data: {
         currency: "gbp",
-        product_data: {
-          name: item.name,
-          description: `Model: ${item.options?.model || 'N/A'}, Message: ${item.options?.text || 'None'}`
-        },
-        unit_amount: Math.round(item.price * 100)
+        product_data: { name: item.name },
+        unit_amount: Math.round(item.price * 100),
       },
-      quantity: item.quantity || 1
+      quantity: item.quantity || 1,
     }));
 
-    // 📩 Send order email to yourself
-    const attachments = req.files?.map((file, i) => ({
-      filename: file.originalname,
-      content: file.buffer
-    })) || [];
+    // ✅ Stripe Checkout
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items,
+      mode: "payment",
+      success_url: "https://www.xcustomised.com/success.html",
+      cancel_url: "https://www.xcustomised.com/cancel.html",
+    });
 
+    // ✅ Send Email with Order Details & Uploads
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -46,45 +53,34 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       }
     });
 
-    const emailBody = `
-      <h2>🛒 New Order from ${customerName}</h2>
-      <p><strong>Email:</strong> ${customerEmail}</p>
-      <ul>
-        ${cartItems.map((item, i) => `
-          <li>
-            <strong>${item.quantity} x ${item.name}</strong><br/>
-            Model: ${item.options?.model || 'N/A'}<br/>
-            Message: ${item.options?.text || 'None'}<br/>
-            File: ${item.options?.photo || 'No file uploaded'}
-          </li>
-        `).join('')}
-      </ul>
-    `;
+    const attachments = req.files.map(file => ({
+      filename: file.originalname,
+      path: file.path
+    }));
 
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: `"X Customised Store" <${process.env.EMAIL_USER}>`,
       to: process.env.EMAIL_USER,
-      subject: `New Order from ${customerName}`,
-      html: emailBody,
+      subject: "🛒 New Order Received",
+      html: `<p><strong>Order Details:</strong></p>
+             <ul>${cart.map(i => `
+                <li>
+                  ${i.quantity} × ${i.name} — £${(i.price * i.quantity).toFixed(2)}<br/>
+                  Text: ${i.options?.text || "-"}<br/>
+                  Model: ${i.options?.model || "-"}<br/>
+                  Media: ${i.options?.photo || "-"}
+                </li>`).join("")}</ul>`,
       attachments
-    });
-
-    // 🧾 Create Stripe Checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items,
-      mode: "payment",
-      success_url: "https://www.xcustomised.com/success.html",
-      cancel_url: "https://www.xcustomised.com/cancel.html"
     });
 
     res.json({ url: session.url });
 
   } catch (err) {
-    console.error("❌ Stripe session error:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Stripe error:", err);
+    res.status(500).json({ error: err.message || "Server error" });
   }
 });
 
-const PORT = process.env.PORT || 4242;
-app.listen(PORT, () => console.log(`✅ Server running on http://localhost:${PORT}`));
+app.listen(4242, () => {
+  console.log("✅ Server running on http://localhost:4242");
+});
