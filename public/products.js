@@ -33,6 +33,13 @@ const products = [
     price: 17.99,
     image: "images/photo-slate.jpg",
     video: "videos/photo-slate.mp4"
+  },
+  {
+    id: 6,
+    name: "Kids Insulated Water Bottle",
+    price: 12.99,
+    image: "images/water-bottle.jpg",
+    video: "videos/photo-slate.mp4"
   }
 ];
 
@@ -47,8 +54,10 @@ if (localStorage.getItem("cart")) {
 }
 
 function saveCart() {
-  localStorage.setItem("cart", JSON.stringify(cart));
+  const cleanCart = cart.map(({ photoFile, ...item }) => item);
+  localStorage.setItem("cart", JSON.stringify(cleanCart));
 }
+
 
 function renderProducts() {
   const container = document.getElementById("products");
@@ -141,9 +150,13 @@ function viewCart() {
   }
 
   const items = cart.map((p, i) => {
-    const imagePreview = p.photoFile
-  ? URL.createObjectURL(p.photoFile)
-  : p.image || "images/upload-placeholder.png";
+   const imagePreview =
+  p.photoFile instanceof File
+    ? URL.createObjectURL(p.photoFile)
+    : p.options?.photoFilename
+      ? `uploads/${p.options.photoFilename}`
+      : p.image || "images/upload-placeholder.png";
+
 
 
     return `

@@ -1,16 +1,13 @@
-// server.js
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const nodemailer = require("nodemailer");
-require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-
-// Middleware
 app.use(cors());
 app.use(express.static("public"));
 app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
@@ -20,7 +17,6 @@ const ordersDir = path.join(__dirname, "orders");
 fs.mkdirSync(uploadDir, { recursive: true });
 fs.mkdirSync(ordersDir, { recursive: true });
 
-// File upload config
 const storage = multer.diskStorage({
   destination: (_, __, cb) => cb(null, uploadDir),
   filename: (_, file, cb) => {
@@ -30,6 +26,13 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ✅ 1. Handle image uploads
+app.post("/upload-photo", upload.single("photo"), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+  res.json({ filename: req.file.filename });
+});
+
+// ✅ 2. Create Stripe Checkout Session
 app.post("/create-checkout-session", upload.any(), async (req, res) => {
   try {
     const rawCart = req.body.cart || "[]";
@@ -37,12 +40,12 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
 
     try {
       cart = JSON.parse(rawCart);
-    } catch (err) {
-      throw new Error("Invalid cart JSON format");
+    } catch {
+      throw new Error("Invalid cart format.");
     }
 
     if (!Array.isArray(cart) || cart.length === 0) {
-      throw new Error("Cart is empty or malformed");
+      throw new Error("Cart is empty or malformed.");
     }
 
     const customer = {
@@ -50,7 +53,6 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       email: req.body.email || process.env.EMAIL_TO
     };
 
-    // Validate items and build line_items
     const line_items = cart.map(item => {
       if (
         !item.name ||
@@ -66,7 +68,7 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
           currency: "gbp",
           product_data: {
             name: item.name,
-            description: `${item.options?.text || ""} - ${item.options?.model || ""}`
+            description: `${item.options?.text || ""} - ${item.options?.model || ""}`.trim()
           },
           unit_amount: Math.round(item.price * 100)
         },
@@ -82,18 +84,15 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
       cancel_url: `${process.env.DOMAIN}/cancel.html`
     });
 
-    // Save cart to file
     const orderId = `order-${Date.now()}`;
     const orderFile = path.join(ordersDir, `${orderId}.json`);
     fs.writeFileSync(orderFile, JSON.stringify(cart, null, 2));
 
-    // Handle photo uploads
     const attachments = req.files?.map(file => ({
       filename: file.originalname,
       path: file.path
     })) || [];
 
-    // Send email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -112,7 +111,7 @@ app.post("/create-checkout-session", upload.any(), async (req, res) => {
               <strong>${p.quantity} × ${p.name}</strong> - £${(p.price * p.quantity).toFixed(2)}<br/>
               Text: ${p.options?.text || "None"}<br/>
               Model: ${p.options?.model || "N/A"}<br/>
-              Photo: ${p.options?.photo || "No file"}
+              Photo: ${p.options?.photoFilename || "No file"}
             </li>
           `).join("")}
         </ul>
